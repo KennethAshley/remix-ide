@@ -5,6 +5,7 @@ const EventManager = remixLib.EventManager
 module.exports = class registry {
   constructor () {
     this.state = {}
+    this.stateUid = {}
   }
   put ({ api, events, name }) {
     const serveruid = moduleID() + '.' + (name || '')
@@ -12,50 +13,47 @@ module.exports = class registry {
     if (this.state[serveruid]) return this.state[serveruid]
     const server = {
       uid: serveruid,
-      // api: new ApiManager(api),
-      events: makeEvents(events),
-      legacyEvents: api.event ? api.event : new EventManager()
+      event: api.event ? api.event : new EventManager(),
+      clients: []
+    }
+    this.state[name] = {
+      _name: name,
+      _api: api,
+      _events: events,
+      server: server
     }
     this.state[serveruid] = {
       _name: name,
       _api: api,
       _events: events,
-      server: server,
-      clients: []
+      server: server
     }
     return server
   }
-  get (uid) {
+  getByUid (uid) {
     const clientuid = moduleID()
-    const state = this.state[uid]
+    const state = this.stateUid[uid]
     if (!state) return
     const server = state.server
     const client = {
       uid: clientuid,
       api: state._api,
-      events: server.events,
-      legacyEvents: server.legacyEvents
+      event: server.event
     }
     server.clients.push(client)
     return client
   }
-}
-
-function makeEvents (events) {
-  if (!events) return []
-  function update (name) { update[name] = new EventManager() }
-  return events.reduce((fn, x) => {
-    fn[x] = new EventManager()
-    var oldTrigger = fn[x].trigger
-    fn[x].trigger = (name, args) => {
-      console.log(name)
-      oldTrigger.call(fn[x], name, args)
+  get (name) {
+    const clientuid = moduleID()
+    const state = this.state[name]
+    if (!state) return
+    const server = state.server
+    const client = {
+      uid: clientuid,
+      api: state._api,
+      event: server.event
     }
-    var oldRegister = fn[x].register
-    fn[x].register = (name, obj, fn) => {
-      console.log(name)
-      oldRegister.call(fn[x], obj, fn)
-    }
-    return fn
-  }, update)
+    server.clients.push(client)
+    return client
+  }
 }
